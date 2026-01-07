@@ -1417,10 +1417,18 @@ def main():
     application.add_handler(CommandHandler('stop', stop_everything))
     
     print("🚀 Bot is starting...")
+    
+    # Init application
+    # Quan trọng: Thêm await application.bot.delete_webhook(drop_pending_updates=True) để fix lỗi lệnh
+    # Tuy nhiên run_polling đã có logic này, nhưng ta nên tường minh.
+    
     print("📡 Using polling mode (long-polling)")
     print("🌐 Waiting for incoming messages...")
     print("=" * 50)
-    application.run_polling()
+    
+    # drop_pending_updates=True: Xóa messages cũ bị kẹt để bot phản hồi lệnh mới ngay
+    # allowed_updates=Update.ALL_TYPES: Nhận mọi loại update
+    application.run_polling(drop_pending_updates=True, allowed_updates=Update.ALL_TYPES)
 
 if __name__ == '__main__':
     keep_alive()
