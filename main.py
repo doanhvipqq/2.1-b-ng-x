@@ -1552,7 +1552,27 @@ def main():
     application.add_handler(CommandHandler('ping', ping_command))
     application.add_handler(CommandHandler('uptime', uptime_command))
     
+    # Set Bot Commands Menu - Hiển thị gợi ý lệnh khi gõ /
+    async def set_commands():
+        from telegram import BotCommand
+        commands = [
+            BotCommand("start", "🚀 Khởi động bot"),
+            BotCommand("help", "❓ Xem hướng dẫn"),
+            BotCommand("status", "📊 Trạng thái automation"),
+            BotCommand("thongke", "📈 Xem thống kê chi tiết"),
+            BotCommand("stop", "🛑 Dừng automation"),
+            BotCommand("ping", "🏓 Kiểm tra độ trễ"),
+            BotCommand("uptime", "⏰ Thời gian hoạt động"),
+            BotCommand("reset", "🔄 Reset bot"),
+        ]
+        await application.bot.set_my_commands(commands)
+        logging.info("✅ Bot commands menu set successfully")
+    
     print("🚀 Bot is starting...")
+    
+    # Set commands menu
+    import asyncio
+    asyncio.get_event_loop().run_until_complete(set_commands())
     
     # Init application
     # Quan trọng: Thêm await application.bot.delete_webhook(drop_pending_updates=True) để fix lỗi lệnh
@@ -1561,6 +1581,7 @@ def main():
     print("📡 Using polling mode (long-polling)")
     print("🌐 Waiting for incoming messages...")
     print("=" * 50)
+
     
     # drop_pending_updates=True: Xóa messages cũ bị kẹt để bot phản hồi lệnh mới ngay
     # allowed_updates=Update.ALL_TYPES: Nhận mọi loại update
