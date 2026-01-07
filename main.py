@@ -1301,11 +1301,14 @@ async def admin_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 def main():
     # Validate configuration
-    print("=" * 50)
-    print("🤖 TELEGRAM BOT AUTOMATION STARTING")
-    print("=" * 50)
-    
-    # Handler xử lý command khi đang ở trong hội thoại
+    # Setup logging
+    logging.basicConfig(
+        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+        level=logging.INFO
+    )
+    # Force logger to stdout for Render
+    logger = logging.getLogger(__name__)
+    logger.info("🎬 STARTING BOT initialization...")
     
     # 1. Hàm wrapper cho Start để nó hoạt động như một lệnh Reset cứng trong mọi tình huống
     async def start_fallback(update: Update, context: ContextTypes.DEFAULT_TYPE):

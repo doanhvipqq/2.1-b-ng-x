@@ -6,7 +6,7 @@ app = Flask('')
 
 @app.route('/')
 def home():
-    return "I am alive!"
+    return "<h1>🤖 Bong X Bot is ALIVE!</h1><p>System status: Running</p>"
 
 def run():
     # Use PORT from environment variable (required by Render.com)
