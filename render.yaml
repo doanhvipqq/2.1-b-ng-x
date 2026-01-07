@@ -1,0 +1,14 @@
+services:
+  - type: web
+    name: telegram-automation-bot
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: python main.py
+    envVars:
+      - key: PORT
+        value: 10000
+      - key: TELEGRAM_BOT_TOKEN
+        sync: false
+      # Optional: Restrict bot access to specific user IDs
+      # - key: ALLOWED_USER_IDS
+      #   value: "123456789,987654321"
