@@ -5,6 +5,8 @@ import sys
 import threading
 import time
 import html
+import aiohttp
+import json
 from datetime import datetime
 from config import Config
 
@@ -63,6 +65,22 @@ automation_sessions = {}
 # Thông tin user để admin theo dõi
 # Format: {user_id: {'username': '@username', 'first_name': 'Name', 'last_active': timestamp}}
 user_info = {}
+
+# Lưu thời gian khởi động bot
+bot_start_time = time.time()
+
+
+async def get_random_gif():
+    """Lấy GIF ngẫu nhiên từ OtakuGifs API"""
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.get('https://api.otakugifs.xyz/gif?reaction=hug', timeout=aiohttp.ClientTimeout(total=5)) as response:
+                if response.status == 200:
+                    data = await response.json()
+                    return data.get('url', None)
+    except Exception as e:
+        logging.error(f"Error fetching GIF: {e}")
+    return None
 
 
 def format_progress_message(platform, message, stats, username):
@@ -171,6 +189,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         "📞 @doanhvip12"
     )
     
+    
     keyboard = [
         [
             InlineKeyboardButton("📸 Instagram", callback_data='ig'),
@@ -183,7 +202,27 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     ]
     
     reply_markup = InlineKeyboardMarkup(keyboard)
-    await update.message.reply_text(welcome_text, reply_markup=reply_markup, parse_mode='HTML')
+    
+    # Lấy GIF từ API
+    gif_url = await get_random_gif()
+    
+    if gif_url:
+        try:
+            # Gửi GIF với caption
+            await update.message.reply_animation(
+                animation=gif_url,
+                caption=welcome_text,
+                reply_markup=reply_markup,
+                parse_mode='HTML'
+            )
+        except Exception as e:
+            logging.error(f"Error sending GIF in /start: {e}")
+            # Fallback: gửi text thông thường nếu GIF lỗi
+            await update.message.reply_text(welcome_text, reply_markup=reply_markup, parse_mode='HTML')
+    else:
+        # Nếu không lấy được GIF, gửi text thông thường
+        await update.message.reply_text(welcome_text, reply_markup=reply_markup, parse_mode='HTML')
+    
     return MAIN_MENU
 
 async def menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -203,11 +242,9 @@ async def menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
             "   • Like • Follow • Comment\n\n"
             "💼 <b>LinkedIn</b>\n"
             "   • Like • Follow • Share\n\n"
-            "� <i>Chọn nền tảng bên dưới để bắt đầu</i>\n\n"
-            "━━━━━━━━━━━━━━━━━━━━━━━\n"
+            "💎 <i>Chọn nền tảng bên dưới để bắt đầu</i>\n\n"
             "👨‍💻 <b>Trần Đức Doanh</b>\n"
-            "👑 t.me/doanhvip1 • @doanhvip12\n"
-            "━━━━━━━━━━━━━━━━━━━━━━━"
+            "👑 t.me/doanhvip1 • @doanhvip12"
         )
         keyboard = [
             [
@@ -227,57 +264,47 @@ async def menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
         is_admin = (user_id == Config.ADMIN_USER_ID)
         
         help_text = (
-            "⚡️━━━━━━━━━━━━━━━━━━━━━━⚡️\n"
-            "           ⚽ <b>BÓNG X</b> ⚽\n"
-            "⚡️━━━━━━━━━━━━━━━━━━━━━━⚡️\n\n"
-            "┏━━━ <b>📋 LỆNH CƠ BẢN</b> ━━━┓\n"
-            "┃  /start   → Khởi động bot         ┃\n"
-            "┃  /help    → Xem hướng dẫn         ┃\n"
-            "┃  /status  → Trạng thái hiện tại   ┃\n"
-            "┃  /thongke → Xem thống kê chi tiết ┃\n"
-            "┃  /stop    → Dừng automation       ┃\n"
-            "┃  /reset   → Reset bot              ┃\n"
-            "┗━━━━━━━━━━━━━━━━━━━━━━━┛\n\n"
-            "┏━━ <b>📊 THỐNG KÊ</b> ━━┓\n"
-            "┃  <b>/thongke</b> hoặc <b>/stats</b>     ┃\n"
-            "┃                                   ┃\n"
-            "┃  • Tốc độ chạy (jobs/phút)       ┃\n"
-            "┃  • Tiến độ (%)                   ┃\n"
-            "┃  • Thu nhập real-time            ┃\n"
-            "┃  • Tỷ lệ thành công              ┃\n"
-            "┗━━━━━━━━━━━━━━━━━━━━━━━┛\n\n"
+            "⚽ <b>BÓNG X</b> ⚽\n\n"
+            "<b>📋 LỆNH CƠ BẢN</b>\n\n"
+            "  /start   → Khởi động bot\n"
+            "  /help    → Xem hướng dẫn\n"
+            "  /status  → Trạng thái hiện tại\n"
+            "  /thongke → Xem thống kê chi tiết\n"
+            "  /stop    → Dừng automation\n"
+            "  /reset   → Reset bot\n"
+            "  /ping    → Kiểm tra độ trễ bot\n"
+            "  /uptime  → Thời gian chạy bot\n\n"
+            "<b>📊 THỐNG KÊ</b>\n\n"
+            "  <b>/thongke</b> hoặc <b>/stats</b>\n"
+            "  • Tốc độ chạy (jobs/phút)\n"
+            "  • Tiến độ (%)\n"
+            "  • Thu nhập real-time\n"
+            "  • Tỷ lệ thành công\n\n"
         )
         
         if is_admin:
             help_text += (
-                "┏━━ <b>👑 ADMIN PANEL</b> ━━┓\n"
-                "┃  <b>/admin</b> - Quản lý hệ thống   ┃\n"
-                "┃                                   ┃\n"
-                "┃  • Tất cả users đang chạy        ┃\n"
-                "┃  • Tốc độ & Hiệu suất            ┃\n"
-                "┃  • Tổng thu nhập                 ┃\n"
-                "┗━━━━━━━━━━━━━━━━━━━━━━━┛\n\n"
+                "<b>👑 ADMIN PANEL</b>\n\n"
+                "  <b>/admin</b> - Quản lý hệ thống\n"
+                "  • Tất cả users đang chạy\n"
+                "  • Tốc độ & Hiệu suất\n"
+                "  • Tổng thu nhập\n\n"
             )
         
         help_text += (
-            "┏━━ <b>🔧 HƯỚNG DẪN</b> ━━┓\n"
-            "┃                                   ┃\n"
-            "┃  1️⃣ Chọn nền tảng (IG/LinkedIn)  ┃\n"
-            "┃  2️⃣ Nhập Token + T Header        ┃\n"
-            "┃  3️⃣ Chọn tài khoản               ┃\n"
-            "┃  4️⃣ Nhập Cookie                  ┃\n"
-            "┃  5️⃣ Cấu hình Jobs + Delay        ┃\n"
-            "┃  6️⃣ Xác nhận và chạy!            ┃\n"
-            "┃                                   ┃\n"
-            "┗━━━━━━━━━━━━━━━━━━━━━━━┛\n\n"
+            "<b>🔧 HƯỚNG DẪN</b>\n\n"
+            "  1️⃣ Chọn nền tảng (IG/LinkedIn)\n"
+            "  2️⃣ Nhập Token + T Header\n"
+            "  3️⃣ Chọn tài khoản\n"
+            "  4️⃣ Nhập Cookie\n"
+            "  5️⃣ Cấu hình Jobs + Delay\n"
+            "  6️⃣ Xác nhận và chạy!\n\n"
             "💡 <b>GỢI Ý:</b>\n"
             "  • Delay ≥ 10s để tránh spam\n"
             "  • Dùng /thongke xem chi tiết\n"
             "  • Token lấy từ Golike\n\n"
-            "━━━━━━━━━━━━━━━━━━━━━━━\n"
             "👨‍💻 <b>Trần Đức Doanh</b>\n"
-            "� t.me/doanhvip1 • @doanhvip12\n"
-            "━━━━━━━━━━━━━━━━━━━━━━━"
+            "👑 t.me/doanhvip1 • @doanhvip12"
         )
         keyboard = [[InlineKeyboardButton("🔙 Quay lại", callback_data='back')]]
         await query.edit_message_text(help_text, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode='HTML')
@@ -535,13 +562,11 @@ async def instagram_delay_input(update: Update, context: ContextTypes.DEFAULT_TY
         
         # Show confirmation with all settings
         confirmation_text = (
-            "🔍 <b>KIỂM TRA LẠI THÔNG TIN</b>\n"
-            "──────────────\n\n"
+            "🔍 <b>KIỂM TRA LẠI THÔNG TIN</b>\n\n"
             "📱 <b>Nền tảng:</b> Instagram\n"
             f"👤 <b>Tài khoản:</b> @{context.user_data['ig_username']}\n"
             f"🔢 <b>Số Jobs:</b> {context.user_data['ig_limit']}\n"
             f"⏱️ <b>Delay:</b> {delay}s\n\n"
-            "──────────────\n"
             "✅ <b>Xác nhận để bắt đầu automation?</b>"
         )
         keyboard = [
@@ -987,57 +1012,45 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     is_admin = (user_id == Config.ADMIN_USER_ID)
     
     help_text = (
-        "⚡️━━━━━━━━━━━━━━━━━━━━━━⚡️\n"
-        "           ⚽ <b>BÓNG X</b> ⚽\n"
-        "⚡️━━━━━━━━━━━━━━━━━━━━━━⚡️\n\n"
-        "┏━━━ <b>📋 LỆNH CƠ BẢN</b> ━━━┓\n"
-        "┃  /start   → Khởi động bot         ┃\n"
-        "┃  /help    → Xem hướng dẫn         ┃\n"
-        "┃  /status  → Trạng thái hiện tại   ┃\n"
-        "┃  /thongke → Xem thống kê chi tiết ┃\n"
-        "┃  /stop    → Dừng automation       ┃\n"
-        "┃  /reset   → Reset bot              ┃\n"
-        "┗━━━━━━━━━━━━━━━━━━━━━━━┛\n\n"
-        "┏━━ <b>📊 THỐNG KÊ</b> ━━┓\n"
-        "┃  <b>/thongke</b> hoặc <b>/stats</b>     ┃\n"
-        "┃                                   ┃\n"
-        "┃  • Tốc độ chạy (jobs/phút)       ┃\n"
-        "┃  • Tiến độ (%)                   ┃\n"
-        "┃  • Thu nhập real-time            ┃\n"
-        "┃  • Tỷ lệ thành công              ┃\n"
-        "┗━━━━━━━━━━━━━━━━━━━━━━━┛\n\n"
+        "⚽ <b>BÓNG X</b> ⚽\n\n"
+        "<b>📋 LỆNH CƠ BẢN</b>\n\n"
+        "  /start   → Khởi động bot\n"
+        "  /help    → Xem hướng dẫn\n"
+        "  /status  → Trạng thái hiện tại\n"
+        "  /thongke → Xem thống kê chi tiết\n"
+        "  /stop    → Dừng automation\n"
+        "  /reset   → Reset bot\n\n"
+        "<b>📊 THỐNG KÊ</b>\n\n"
+        "  <b>/thongke</b> hoặc <b>/stats</b>\n"
+        "  • Tốc độ chạy (jobs/phút)\n"
+        "  • Tiến độ (%)\n"
+        "  • Thu nhập real-time\n"
+        "  • Tỷ lệ thành công\n\n"
     )
     
     if is_admin:
         help_text += (
-            "┏━━ <b>👑 ADMIN PANEL</b> ━━┓\n"
-            "┃  <b>/admin</b> - Quản lý hệ thống   ┃\n"
-            "┃                                   ┃\n"
-            "┃  • Tất cả users đang chạy        ┃\n"
-            "┃  • Tốc độ & Hiệu suất            ┃\n"
-            "┃  • Tổng thu nhập                 ┃\n"
-            "┗━━━━━━━━━━━━━━━━━━━━━━━┛\n\n"
+            "<b>👑 ADMIN PANEL</b>\n\n"
+            "  <b>/admin</b> - Quản lý hệ thống\n"
+            "  • Tất cả users đang chạy\n"
+            "  • Tốc độ & Hiệu suất\n"
+            "  • Tổng thu nhập\n\n"
         )
     
     help_text += (
-        "┏━━ <b>🔧 HƯỚNG DẪN</b> ━━┓\n"
-        "┃                                   ┃\n"
-        "┃  1️⃣ Chọn nền tảng (IG/LinkedIn)  ┃\n"
-        "┃  2️⃣ Nhập Token + T Header        ┃\n"
-        "┃  3️⃣ Chọn tài khoản               ┃\n"
-        "┃  4️⃣ Nhập Cookie                  ┃\n"
-        "┃  5️⃣ Cấu hình Jobs + Delay        ┃\n"
-        "┃  6️⃣ Xác nhận và chạy!            ┃\n"
-        "┃                                   ┃\n"
-        "┗━━━━━━━━━━━━━━━━━━━━━━━┛\n\n"
+        "<b>🔧 HƯỚNG DẪN</b>\n\n"
+        "  1️⃣ Chọn nền tảng (IG/LinkedIn)\n"
+        "  2️⃣ Nhập Token + T Header\n"
+        "  3️⃣ Chọn tài khoản\n"
+        "  4️⃣ Nhập Cookie\n"
+        "  5️⃣ Cấu hình Jobs + Delay\n"
+        "  6️⃣ Xác nhận và chạy!\n\n"
         "💡 <b>GỢI Ý:</b>\n"
         "  • Delay ≥ 10s để tránh spam\n"
         "  • Dùng /thongke xem chi tiết\n"
         "  • Token lấy từ Golike\n\n"
-        "━━━━━━━━━━━━━━━━━━━━━━━\n"
         "👨‍💻 <b>Trần Đức Doanh</b>\n"
-        "👑 t.me/doanhvip1 • @doanhvip12\n"
-        "━━━━━━━━━━━━━━━━━━━━━━━"
+        "👑 t.me/doanhvip1 • @doanhvip12"
     )
     await update.message.reply_text(help_text, parse_mode='HTML')
 
@@ -1063,6 +1076,115 @@ async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg += "\n📈 Dùng /thongke để xem chi tiết"
     await update.message.reply_text(msg, parse_mode='HTML')
 
+async def ping_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Kiểm tra thời gian phản hồi của bot"""
+    logging.info("CMD: /ping received")
+    start_time = time.time()
+    
+    # Gửi message và đo thời gian
+    sent_msg = await update.message.reply_text("🏓 Pinging...")
+    
+    # Tính thời gian phản hồi
+    ping_time = (time.time() - start_time) * 1000  # Convert to milliseconds
+    
+    # Xác định tốc độ
+    if ping_time < 100:
+        status_emoji = "🟢"
+        status_text = "Tuyệt vời"
+    elif ping_time < 300:
+        status_emoji = "🟡"
+        status_text = "Tốt"
+    else:
+        status_emoji = "🔴"
+        status_text = "Chậm"
+    
+    msg = (
+        f"{status_emoji} <b>PONG!</b>\n\n"
+        f"⚡ Độ trễ: <code>{ping_time:.2f}ms</code>\n"
+        f"📊 Trạng thái: <b>{status_text}</b>\n\n"
+        f"🤖 Bot đang hoạt động bình thường"
+    )
+    
+    # Lấy GIF từ API
+    gif_url = await get_random_gif()
+    
+    # Xóa message "Pinging..." trước
+    await sent_msg.delete()
+    
+    if gif_url:
+        try:
+            # Gửi GIF với caption
+            await update.message.reply_animation(
+                animation=gif_url,
+                caption=msg,
+                parse_mode='HTML'
+            )
+        except Exception as e:
+            logging.error(f"Error sending GIF in /ping: {e}")
+            # Fallback: gửi text thông thường nếu GIF lỗi
+            await update.message.reply_text(msg, parse_mode='HTML')
+    else:
+        # Nếu không lấy được GIF, gửi text thông thường
+        await update.message.reply_text(msg, parse_mode='HTML')
+
+
+async def uptime_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Hiển thị thời gian bot đã chạy"""
+    logging.info("CMD: /uptime received")
+    
+    # Tính thời gian đã chạy
+    uptime_seconds = int(time.time() - bot_start_time)
+    
+    # Chuyển đổi sang days, hours, minutes, seconds
+    days = uptime_seconds // 86400
+    hours = (uptime_seconds % 86400) // 3600
+    minutes = (uptime_seconds % 3600) // 60
+    seconds = uptime_seconds % 60
+    
+    # Format thời gian
+    uptime_parts = []
+    if days > 0:
+        uptime_parts.append(f"{days} ngày")
+    if hours > 0:
+        uptime_parts.append(f"{hours} giờ")
+    if minutes > 0:
+        uptime_parts.append(f"{minutes} phút")
+    if seconds > 0 or not uptime_parts:  # Hiển thị giây nếu < 1 phút
+        uptime_parts.append(f"{seconds} giây")
+    
+    uptime_text = ", ".join(uptime_parts)
+    
+    # Thời gian khởi động
+    start_datetime = datetime.fromtimestamp(bot_start_time)
+    start_text = start_datetime.strftime("%d/%m/%Y %H:%M:%S")
+    
+    msg = (
+        "⏰ <b>THỜI GIAN HOẠT ĐỘNG</b>\n\n"
+        f"🚀 Khởi động: <code>{start_text}</code>\n"
+        f"⏱️ Đã chạy: <code>{uptime_text}</code>\n\n"
+        f"📊 Bot đã hoạt động được <b>{uptime_seconds:,}</b> giây"
+    )
+    
+    # Lấy GIF từ API
+    gif_url = await get_random_gif()
+    
+    if gif_url:
+        try:
+            # Gửi GIF với caption
+            await update.message.reply_animation(
+                animation=gif_url,
+                caption=msg,
+                parse_mode='HTML'
+            )
+        except Exception as e:
+            logging.error(f"Error sending GIF in /uptime: {e}")
+            # Fallback: gửi text thông thường nếu GIF lỗi
+            await update.message.reply_text(msg, parse_mode='HTML')
+    else:
+        # Nếu không lấy được GIF, gửi text thông thường
+        await update.message.reply_text(msg, parse_mode='HTML')
+
+
 async def thongke_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     logging.info("CMD: /thongke received")
     user_id = update.effective_user.id
@@ -1070,8 +1192,7 @@ async def thongke_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Check if user has any active sessions
     if user_id not in automation_sessions or not automation_sessions[user_id]:
         msg = (
-            "📊 <b>THỐNG KÊ CHI TIẾT</b>\n"
-            "═══════════════════\n\n"
+            "📊 <b>THỐNG KÊ CHI TIẾT</b>\n\n"
             "⚠️ <i>Chưa có session nào đang chạy</i>\n\n"
             "💡 Sử dụng /start để bắt đầu automation"
         )
@@ -1079,8 +1200,7 @@ async def thongke_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     
     msg = (
-        "📊 <b>THỐNG KÊ CHI TIẾT</b>\n"
-        "═══════════════════\n\n"
+        "📊 <b>THỐNG KÊ CHI TIẾT</b>\n\n"
     )
     
     user_sessions = automation_sessions[user_id]
@@ -1118,8 +1238,7 @@ async def thongke_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"✅ Hoàn thành: <code>{completed}</code> jobs\n"
             f"❌ Thất bại: <code>{failed}</code> jobs\n"
             f"💰 Tổng kiếm: <code>{earned:,}</code> VND\n"
-            f"📊 Trạng thái: <i>{current_status}</i>\n"
-            "───────────────────\n\n"
+            f"📊 Trạng thái: <i>{current_status}</i>\n\n"
         )
     
     # LinkedIn stats
@@ -1152,8 +1271,7 @@ async def thongke_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"✅ Hoàn thành: <code>{completed}</code> jobs\n"
             f"❌ Thất bại: <code>{failed}</code> jobs\n"
             f"💰 Tổng kiếm: <code>{earned:,}</code> VND\n"
-            f"📊 Trạng thái: <i>{current_status}</i>\n"
-            "───────────────────\n\n"
+            f"📊 Trạng thái: <i>{current_status}</i>\n\n"
         )
     
     # Tổng kết
@@ -1426,6 +1544,8 @@ def main():
     application.add_handler(CommandHandler('admin', admin_command))
     application.add_handler(CommandHandler('reset', reset))
     application.add_handler(CommandHandler('stop', stop_everything))
+    application.add_handler(CommandHandler('ping', ping_command))
+    application.add_handler(CommandHandler('uptime', uptime_command))
     
     print("🚀 Bot is starting...")
     
