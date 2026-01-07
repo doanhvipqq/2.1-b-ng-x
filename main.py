@@ -967,6 +967,327 @@ async def stop_everything(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         await update.message.reply_text("⚠️ Bạn không có automation nào đang chạy!")
 
 
+
+# --- Command Handlers ---
+
+async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+    is_admin = (user_id == Config.ADMIN_USER_ID)
+    
+    help_text = (
+        "⚡️━━━━━━━━━━━━━━━━━━━━━━⚡️\n"
+        "           ⚽ <b>BÓNG X</b> ⚽\n"
+        "⚡️━━━━━━━━━━━━━━━━━━━━━━⚡️\n\n"
+        "┏━━━ <b>📋 LỆNH CƠ BẢN</b> ━━━┓\n"
+        "┃  /start   → Khởi động bot         ┃\n"
+        "┃  /help    → Xem hướng dẫn         ┃\n"
+        "┃  /status  → Trạng thái hiện tại   ┃\n"
+        "┃  /thongke → Xem thống kê chi tiết ┃\n"
+        "┃  /stop    → Dừng automation       ┃\n"
+        "┃  /reset   → Reset bot              ┃\n"
+        "┗━━━━━━━━━━━━━━━━━━━━━━━┛\n\n"
+        "┏━━ <b>📊 THỐNG KÊ</b> ━━┓\n"
+        "┃  <b>/thongke</b> hoặc <b>/stats</b>     ┃\n"
+        "┃                                   ┃\n"
+        "┃  • Tốc độ chạy (jobs/phút)       ┃\n"
+        "┃  • Tiến độ (%)                   ┃\n"
+        "┃  • Thu nhập real-time            ┃\n"
+        "┃  • Tỷ lệ thành công              ┃\n"
+        "┗━━━━━━━━━━━━━━━━━━━━━━━┛\n\n"
+    )
+    
+    if is_admin:
+        help_text += (
+            "┏━━ <b>👑 ADMIN PANEL</b> ━━┓\n"
+            "┃  <b>/admin</b> - Quản lý hệ thống   ┃\n"
+            "┃                                   ┃\n"
+            "┃  • Tất cả users đang chạy        ┃\n"
+            "┃  • Tốc độ & Hiệu suất            ┃\n"
+            "┃  • Tổng thu nhập                 ┃\n"
+            "┗━━━━━━━━━━━━━━━━━━━━━━━┛\n\n"
+        )
+    
+    help_text += (
+        "┏━━ <b>🔧 HƯỚNG DẪN</b> ━━┓\n"
+        "┃                                   ┃\n"
+        "┃  1️⃣ Chọn nền tảng (IG/LinkedIn)  ┃\n"
+        "┃  2️⃣ Nhập Token + T Header        ┃\n"
+        "┃  3️⃣ Chọn tài khoản               ┃\n"
+        "┃  4️⃣ Nhập Cookie                  ┃\n"
+        "┃  5️⃣ Cấu hình Jobs + Delay        ┃\n"
+        "┃  6️⃣ Xác nhận và chạy!            ┃\n"
+        "┃                                   ┃\n"
+        "┗━━━━━━━━━━━━━━━━━━━━━━━┛\n\n"
+        "💡 <b>GỢI Ý:</b>\n"
+        "  • Delay ≥ 10s để tránh spam\n"
+        "  • Dùng /thongke xem chi tiết\n"
+        "  • Token lấy từ Golike\n\n"
+        "━━━━━━━━━━━━━━━━━━━━━━━\n"
+        "👨‍💻 <b>Trần Đức Doanh</b>\n"
+        "👑 t.me/doanhvip1 • @doanhvip12\n"
+        "━━━━━━━━━━━━━━━━━━━━━━━"
+    )
+    await update.message.reply_text(help_text, parse_mode='HTML')
+
+async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+    msg = "📊 <b>TÌNH TRẠNG AUTOMATION</b>\n\n"
+    
+    ig_running = user_id in instagram_automations
+    li_running = user_id in linkedin_automations
+    
+    if ig_running:
+        msg += "✅ Instagram: <b>Đang chạy</b>\n"
+    else:
+        msg += "⭕ Instagram: Đang dừng\n"
+        
+    if li_running:
+        msg += "✅ LinkedIn: <b>Đang chạy</b>\n"
+    else:
+        msg += "⭕ LinkedIn: Đang dừng\n"
+    
+    msg += "\n💡 Dùng /stop để dừng automation"
+    msg += "\n📈 Dùng /thongke để xem chi tiết"
+    await update.message.reply_text(msg, parse_mode='HTML')
+
+async def thongke_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+    
+    # Check if user has any active sessions
+    if user_id not in automation_sessions or not automation_sessions[user_id]:
+        msg = (
+            "📊 <b>THỐNG KÊ CHI TIẾT</b>\n"
+            "═══════════════════\n\n"
+            "⚠️ <i>Chưa có session nào đang chạy</i>\n\n"
+            "💡 Sử dụng /start để bắt đầu automation"
+        )
+        await update.message.reply_text(msg, parse_mode='HTML')
+        return
+    
+    msg = (
+        "📊 <b>THỐNG KÊ CHI TIẾT</b>\n"
+        "═══════════════════\n\n"
+    )
+    
+    user_sessions = automation_sessions[user_id]
+    total_earned = 0
+    total_completed = 0
+    total_failed = 0
+    
+    # Instagram stats
+    if 'ig' in user_sessions and user_sessions['ig']:
+        ig_stats = user_sessions['ig']
+        start_time = ig_stats.get('start_time', time.time())
+        running_time = int(time.time() - start_time)
+        hours = running_time // 3600
+        minutes = (running_time % 3600) // 60
+        seconds = running_time % 60
+        
+        completed = ig_stats.get('completed_jobs', 0)
+        failed = ig_stats.get('failed_jobs', 0)
+        earned = ig_stats.get('total_earned', 0)
+        username = ig_stats.get('username', 'N/A')
+        target_jobs = ig_stats.get('target_jobs', 0)
+        current_status = ig_stats.get('current_status', 'Đang chạy')
+        
+        total_earned += earned
+        total_completed += completed
+        total_failed += failed
+        
+        progress = (completed / target_jobs * 100) if target_jobs > 0 else 0
+        
+        msg += (
+            "📸 <b>INSTAGRAM</b>\n"
+            f"👤 Account: <code>@{username}</code>\n"
+            f"⏱️ Thời gian chạy: <code>{hours:02d}:{minutes:02d}:{seconds:02d}</code>\n"
+            f"📈 Tiến độ: <code>{completed}/{target_jobs}</code> ({progress:.1f}%)\n"
+            f"✅ Hoàn thành: <code>{completed}</code> jobs\n"
+            f"❌ Thất bại: <code>{failed}</code> jobs\n"
+            f"💰 Tổng kiếm: <code>{earned:,}</code> VND\n"
+            f"📊 Trạng thái: <i>{current_status}</i>\n"
+            "───────────────────\n\n"
+        )
+    
+    # LinkedIn stats
+    if 'li' in user_sessions and user_sessions['li']:
+        li_stats = user_sessions['li']
+        start_time = li_stats.get('start_time', time.time())
+        running_time = int(time.time() - start_time)
+        hours = running_time // 3600
+        minutes = (running_time % 3600) // 60
+        seconds = running_time % 60
+        
+        completed = li_stats.get('completed_jobs', 0)
+        failed = li_stats.get('failed_jobs', 0)
+        earned = li_stats.get('total_earned', 0)
+        username = li_stats.get('username', 'N/A')
+        target_jobs = li_stats.get('target_jobs', 0)
+        current_status = li_stats.get('current_status', 'Đang chạy')
+        
+        total_earned += earned
+        total_completed += completed
+        total_failed += failed
+        
+        progress = (completed / target_jobs * 100) if target_jobs > 0 else 0
+        
+        msg += (
+            "💼 <b>LINKEDIN</b>\n"
+            f"👤 Account: <code>@{username}</code>\n"
+            f"⏱️ Thời gian chạy: <code>{hours:02d}:{minutes:02d}:{seconds:02d}</code>\n"
+            f"📈 Tiến độ: <code>{completed}/{target_jobs}</code> ({progress:.1f}%)\n"
+            f"✅ Hoàn thành: <code>{completed}</code> jobs\n"
+            f"❌ Thất bại: <code>{failed}</code> jobs\n"
+            f"💰 Tổng kiếm: <code>{earned:,}</code> VND\n"
+            f"📊 Trạng thái: <i>{current_status}</i>\n"
+            "───────────────────\n\n"
+        )
+    
+    # Tổng kết
+    if total_completed > 0 or total_failed > 0:
+        success_rate = (total_completed / (total_completed + total_failed) * 100) if (total_completed + total_failed) > 0 else 0
+        msg += (
+            "📊 <b>TỔNG KẾT</b>\n"
+            f"✅ Jobs hoàn thành: <code>{total_completed}</code>\n"
+            f"❌ Jobs thất bại: <code>{total_failed}</code>\n"
+            f"📈 Tỷ lệ thành công: <code>{success_rate:.1f}%</code>\n"
+            f"💰 <b>Tổng thu nhập: <code>{total_earned:,} VND</code></b>\n"
+            "═══════════════════\n\n"
+            "💡 Sử dụng /stop để dừng automation"
+        )
+    
+    await update.message.reply_text(msg, parse_mode='HTML')
+
+async def admin_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+    
+    # Check if user is admin
+    if user_id != Config.ADMIN_USER_ID:
+        await update.message.reply_text("⛔ Bạn không có quyền sử dụng lệnh này!")
+        return
+    
+    msg = (
+        "👑 <b>ADMIN PANEL</b>\n"
+        "═══════════════════\n\n"
+    )
+    
+    # Tổng số người đang dùng bot
+    total_users = len(automation_sessions)
+    
+    if total_users == 0:
+        msg += "⚠️ <i>Hiện không có user nào đang chạy automation</i>\n\n"
+        msg += f"📊 Tổng user đã dùng bot: <code>{len(user_info)}</code>\n"
+        await update.message.reply_text(msg, parse_mode='HTML')
+        return
+    
+    msg += f"👥 <b>Số người đang online: {total_users}</b>\n"
+    msg += "═══════════════════\n\n"
+    
+    total_all_earned = 0
+    total_all_jobs = 0
+    
+    # Hiển thị từng user
+    for uid, sessions in automation_sessions.items():
+        user_data = user_info.get(uid, {'username': 'Unknown', 'first_name': 'Unknown'})
+        username = user_data.get('username', 'N/A')
+        first_name = user_data.get('first_name', 'Unknown')
+        
+        msg += f"👤 <b>{first_name}</b> (@{username})\n"
+        msg += f"📱 ID: <code>{uid}</code>\n"
+        
+        user_total_earned = 0
+        user_total_jobs = 0
+        
+        # Instagram
+        if 'ig' in sessions and sessions['ig']:
+            ig = sessions['ig']
+            running_time = time.time() - ig['start_time']
+            hours = int(running_time // 3600)
+            minutes = int((running_time % 3600) // 60)
+            
+            completed = ig['completed_jobs']
+            earned = ig['total_earned']
+            delay = ig.get('delay', 0)
+            
+            # Tính tốc độ (jobs/phút)
+            if running_time > 0:
+                speed = (completed / running_time) * 60  # jobs per minute
+            else:
+                speed = 0
+            
+            # Tốc độ mong đợi (1 job mỗi delay seconds)
+            if delay > 0:
+                expected_speed = 60 / delay  # jobs per minute
+                efficiency = (speed / expected_speed * 100) if expected_speed > 0 else 0
+            else:
+                expected_speed = 0
+                efficiency = 0
+            
+            user_total_earned += earned
+            user_total_jobs += completed
+            
+            msg += (
+                f"  📸 <b>Instagram</b>: @{ig['username']}\n"
+                f"    ✅ Jobs: <code>{completed}/{ig['target_jobs']}</code>\n"
+                f"    ⚡ Tốc độ: <code>{speed:.2f}</code> jobs/phút\n"
+                f"    📊 Hiệu suất: <code>{efficiency:.1f}%</code>\n"
+                f"    ⏱️ Đã chạy: <code>{hours}h{minutes:02d}m</code>\n"
+                f"    💰 Kiếm: <code>{earned:,}</code> VND\n"
+            )
+        
+        # LinkedIn
+        if 'li' in sessions and sessions['li']:
+            li = sessions['li']
+            running_time = time.time() - li['start_time']
+            hours = int(running_time // 3600)
+            minutes = int((running_time % 3600) // 60)
+            
+            completed = li['completed_jobs']
+            earned = li['total_earned']
+            delay = li.get('delay', 0)
+            
+            # Tính tốc độ
+            if running_time > 0:
+                speed = (completed / running_time) * 60
+            else:
+                speed = 0
+            
+            if delay > 0:
+                expected_speed = 60 / delay
+                efficiency = (speed / expected_speed * 100) if expected_speed > 0 else 0
+            else:
+                expected_speed = 0
+                efficiency = 0
+            
+            user_total_earned += earned
+            user_total_jobs += completed
+            
+            msg += (
+                f"  💼 <b>LinkedIn</b>: @{li['username']}\n"
+                f"    ✅ Jobs: <code>{completed}/{li['target_jobs']}</code>\n"
+                f"    ⚡ Tốc độ: <code>{speed:.2f}</code> jobs/phút\n"
+                f"    📊 Hiệu suất: <code>{efficiency:.1f}%</code>\n"
+                f"    ⏱️ Đã chạy: <code>{hours}h{minutes:02d}m</code>\n"
+                f"    💰 Kiếm: <code>{earned:,}</code> VND\n"
+            )
+        
+        msg += f"  💵 Tổng: <b>{user_total_earned:,} VND</b> ({user_total_jobs} jobs)\n"
+        msg += "───────────────────\n\n"
+        
+        total_all_earned += user_total_earned
+        total_all_jobs += user_total_jobs
+    
+    # Tổng kết toàn bot
+    msg += (
+        "📊 <b>TỔNG KẾT HỆ THỐNG</b>\n"
+        f"👥 Users đang chạy: <code>{total_users}</code>\n"
+        f"✅ Tổng jobs: <code>{total_all_jobs}</code>\n"
+        f"💰 Tổng thu nhập: <b><code>{total_all_earned:,} VND</code></b>\n"
+        "═══════════════════"
+    )
+    
+    await update.message.reply_text(msg, parse_mode='HTML')
+
+
 def main():
     # Validate configuration
     print("=" * 50)
@@ -1093,260 +1414,3 @@ def main():
 if __name__ == '__main__':
     keep_alive()
     main()
-        user_id = update.effective_user.id
-        
-        # Check if user has any active sessions
-        if user_id not in automation_sessions or not automation_sessions[user_id]:
-            msg = (
-                "📊 <b>THỐNG KÊ CHI TIẾT</b>\n"
-                "═══════════════════\n\n"
-                "⚠️ <i>Chưa có session nào đang chạy</i>\n\n"
-                "💡 Sử dụng /start để bắt đầu automation"
-            )
-            await update.message.reply_text(msg, parse_mode='HTML')
-            return
-        
-        msg = (
-            "📊 <b>THỐNG KÊ CHI TIẾT</b>\n"
-            "═══════════════════\n\n"
-        )
-        
-        user_sessions = automation_sessions[user_id]
-        total_earned = 0
-        total_completed = 0
-        total_failed = 0
-        
-        # Instagram stats
-        if 'ig' in user_sessions and user_sessions['ig']:
-            ig_stats = user_sessions['ig']
-            start_time = ig_stats.get('start_time', time.time())
-            running_time = int(time.time() - start_time)
-            hours = running_time // 3600
-            minutes = (running_time % 3600) // 60
-            seconds = running_time % 60
-            
-            completed = ig_stats.get('completed_jobs', 0)
-            failed = ig_stats.get('failed_jobs', 0)
-            earned = ig_stats.get('total_earned', 0)
-            username = ig_stats.get('username', 'N/A')
-            target_jobs = ig_stats.get('target_jobs', 0)
-            current_status = ig_stats.get('current_status', 'Đang chạy')
-            
-            total_earned += earned
-            total_completed += completed
-            total_failed += failed
-            
-            progress = (completed / target_jobs * 100) if target_jobs > 0 else 0
-            
-            msg += (
-                "📸 <b>INSTAGRAM</b>\n"
-                f"👤 Account: <code>@{username}</code>\n"
-                f"⏱️ Thời gian chạy: <code>{hours:02d}:{minutes:02d}:{seconds:02d}</code>\n"
-                f"📈 Tiến độ: <code>{completed}/{target_jobs}</code> ({progress:.1f}%)\n"
-                f"✅ Hoàn thành: <code>{completed}</code> jobs\n"
-                f"❌ Thất bại: <code>{failed}</code> jobs\n"
-                f"💰 Tổng kiếm: <code>{earned:,}</code> VND\n"
-                f"📊 Trạng thái: <i>{current_status}</i>\n"
-                "───────────────────\n\n"
-            )
-        
-        # LinkedIn stats
-        if 'li' in user_sessions and user_sessions['li']:
-            li_stats = user_sessions['li']
-            start_time = li_stats.get('start_time', time.time())
-            running_time = int(time.time() - start_time)
-            hours = running_time // 3600
-            minutes = (running_time % 3600) // 60
-            seconds = running_time % 60
-            
-            completed = li_stats.get('completed_jobs', 0)
-            failed = li_stats.get('failed_jobs', 0)
-            earned = li_stats.get('total_earned', 0)
-            username = li_stats.get('username', 'N/A')
-            target_jobs = li_stats.get('target_jobs', 0)
-            current_status = li_stats.get('current_status', 'Đang chạy')
-            
-            total_earned += earned
-            total_completed += completed
-            total_failed += failed
-            
-            progress = (completed / target_jobs * 100) if target_jobs > 0 else 0
-            
-            msg += (
-                "💼 <b>LINKEDIN</b>\n"
-                f"👤 Account: <code>@{username}</code>\n"
-                f"⏱️ Thời gian chạy: <code>{hours:02d}:{minutes:02d}:{seconds:02d}</code>\n"
-                f"📈 Tiến độ: <code>{completed}/{target_jobs}</code> ({progress:.1f}%)\n"
-                f"✅ Hoàn thành: <code>{completed}</code> jobs\n"
-                f"❌ Thất bại: <code>{failed}</code> jobs\n"
-                f"💰 Tổng kiếm: <code>{earned:,}</code> VND\n"
-                f"📊 Trạng thái: <i>{current_status}</i>\n"
-                "───────────────────\n\n"
-            )
-        
-        # Tổng kết
-        if total_completed > 0 or total_failed > 0:
-            success_rate = (total_completed / (total_completed + total_failed) * 100) if (total_completed + total_failed) > 0 else 0
-            msg += (
-                "📊 <b>TỔNG KẾT</b>\n"
-                f"✅ Jobs hoàn thành: <code>{total_completed}</code>\n"
-                f"❌ Jobs thất bại: <code>{total_failed}</code>\n"
-                f"📈 Tỷ lệ thành công: <code>{success_rate:.1f}%</code>\n"
-                f"💰 <b>Tổng thu nhập: <code>{total_earned:,} VND</code></b>\n"
-                "═══════════════════\n\n"
-                "💡 Sử dụng /stop để dừng automation"
-            )
-        
-        await update.message.reply_text(msg, parse_mode='HTML')
-    
-    # Add admin command - Only for admin
-    async def admin_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-        user_id = update.effective_user.id
-        
-        # Check if user is admin
-        if user_id != Config.ADMIN_USER_ID:
-            await update.message.reply_text("⛔ Bạn không có quyền sử dụng lệnh này!")
-            return
-        
-        msg = (
-            "👑 <b>ADMIN PANEL</b>\n"
-            "═══════════════════\n\n"
-        )
-        
-        # Tổng số người đang dùng bot
-        total_users = len(automation_sessions)
-        
-        if total_users == 0:
-            msg += "⚠️ <i>Hiện không có user nào đang chạy automation</i>\n\n"
-            msg += f"📊 Tổng user đã dùng bot: <code>{len(user_info)}</code>\n"
-            await update.message.reply_text(msg, parse_mode='HTML')
-            return
-        
-        msg += f"👥 <b>Số người đang online: {total_users}</b>\n"
-        msg += "═══════════════════\n\n"
-        
-        total_all_earned = 0
-        total_all_jobs = 0
-        
-        # Hiển thị từng user
-        for uid, sessions in automation_sessions.items():
-            user_data = user_info.get(uid, {'username': 'Unknown', 'first_name': 'Unknown'})
-            username = user_data.get('username', 'N/A')
-            first_name = user_data.get('first_name', 'Unknown')
-            
-            msg += f"👤 <b>{first_name}</b> (@{username})\n"
-            msg += f"📱 ID: <code>{uid}</code>\n"
-            
-            user_total_earned = 0
-            user_total_jobs = 0
-            
-            # Instagram
-            if 'ig' in sessions and sessions['ig']:
-                ig = sessions['ig']
-                running_time = time.time() - ig['start_time']
-                hours = int(running_time // 3600)
-                minutes = int((running_time % 3600) // 60)
-                
-                completed = ig['completed_jobs']
-                earned = ig['total_earned']
-                delay = ig.get('delay', 0)
-                
-                # Tính tốc độ (jobs/phút)
-                if running_time > 0:
-                    speed = (completed / running_time) * 60  # jobs per minute
-                else:
-                    speed = 0
-                
-                # Tốc độ mong đợi (1 job mỗi delay seconds)
-                if delay > 0:
-                    expected_speed = 60 / delay  # jobs per minute
-                    efficiency = (speed / expected_speed * 100) if expected_speed > 0 else 0
-                else:
-                    expected_speed = 0
-                    efficiency = 0
-                
-                user_total_earned += earned
-                user_total_jobs += completed
-                
-                msg += (
-                    f"  📸 <b>Instagram</b>: @{ig['username']}\n"
-                    f"    ✅ Jobs: <code>{completed}/{ig['target_jobs']}</code>\n"
-                    f"    ⚡ Tốc độ: <code>{speed:.2f}</code> jobs/phút\n"
-                    f"    📊 Hiệu suất: <code>{efficiency:.1f}%</code>\n"
-                    f"    ⏱️ Đã chạy: <code>{hours}h{minutes:02d}m</code>\n"
-                    f"    💰 Kiếm: <code>{earned:,}</code> VND\n"
-                )
-            
-            # LinkedIn
-            if 'li' in sessions and sessions['li']:
-                li = sessions['li']
-                running_time = time.time() - li['start_time']
-                hours = int(running_time // 3600)
-                minutes = int((running_time % 3600) // 60)
-                
-                completed = li['completed_jobs']
-                earned = li['total_earned']
-                delay = li.get('delay', 0)
-                
-                # Tính tốc độ
-                if running_time > 0:
-                    speed = (completed / running_time) * 60
-                else:
-                    speed = 0
-                
-                if delay > 0:
-                    expected_speed = 60 / delay
-                    efficiency = (speed / expected_speed * 100) if expected_speed > 0 else 0
-                else:
-                    expected_speed = 0
-                    efficiency = 0
-                
-                user_total_earned += earned
-                user_total_jobs += completed
-                
-                msg += (
-                    f"  💼 <b>LinkedIn</b>: @{li['username']}\n"
-                    f"    ✅ Jobs: <code>{completed}/{li['target_jobs']}</code>\n"
-                    f"    ⚡ Tốc độ: <code>{speed:.2f}</code> jobs/phút\n"
-                    f"    📊 Hiệu suất: <code>{efficiency:.1f}%</code>\n"
-                    f"    ⏱️ Đã chạy: <code>{hours}h{minutes:02d}m</code>\n"
-                    f"    💰 Kiếm: <code>{earned:,}</code> VND\n"
-                )
-            
-            msg += f"  💵 Tổng: <b>{user_total_earned:,} VND</b> ({user_total_jobs} jobs)\n"
-            msg += "───────────────────\n\n"
-            
-            total_all_earned += user_total_earned
-            total_all_jobs += user_total_jobs
-        
-        # Tổng kết toàn bot
-        msg += (
-            "📊 <b>TỔNG KẾT HỆ THỐNG</b>\n"
-            f"👥 Users đang chạy: <code>{total_users}</code>\n"
-            f"✅ Tổng jobs: <code>{total_all_jobs}</code>\n"
-            f"💰 Tổng thu nhập: <b><code>{total_all_earned:,} VND</code></b>\n"
-            "═══════════════════"
-        )
-        
-        await update.message.reply_text(msg, parse_mode='HTML')
-    
-    application.add_handler(conv_handler)
-    application.add_handler(CommandHandler('help', help_command))
-    application.add_handler(CommandHandler('status', status_command))
-    application.add_handler(CommandHandler('thongke', thongke_command))
-    application.add_handler(CommandHandler('stats', thongke_command))  # Alias
-    application.add_handler(CommandHandler('admin', admin_command))  # Admin only
-    application.add_handler(CommandHandler('reset', reset))
-    application.add_handler(CommandHandler('stop', stop_everything))
-    application.add_handler(CommandHandler('strop', stop_everything)) # Hỗ trợ typo
-    
-    print("🚀 Bot is starting...")
-    print("📡 Using polling mode (long-polling)")
-    print("🌐 Waiting for incoming messages...")
-    print("=" * 50)
-    application.run_polling()
-
-if __name__ == '__main__':
-    keep_alive()
-    main()
-
