@@ -383,6 +383,11 @@ async def menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
         keyboard = [[InlineKeyboardButton("🔙 Menu chính", callback_data='back')]]
         await query.edit_message_text(msg, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode='HTML')
         return MAIN_MENU
+    
+    # Default case - log và return MAIN_MENU để tránh break conversation
+    else:
+        logging.warning(f"Unhandled callback_query data: {query.data}")
+        return MAIN_MENU
 
 # --- Instagram Flow ---
 
