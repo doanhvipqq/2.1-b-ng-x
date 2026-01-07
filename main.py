@@ -982,6 +982,7 @@ async def stop_everything(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
 # --- Command Handlers ---
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    logging.info("CMD: /help received")
     user_id = update.effective_user.id
     is_admin = (user_id == Config.ADMIN_USER_ID)
     
@@ -1041,6 +1042,7 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(help_text, parse_mode='HTML')
 
 async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    logging.info("CMD: /status received")
     user_id = update.effective_user.id
     msg = "📊 <b>TÌNH TRẠNG AUTOMATION</b>\n\n"
     
@@ -1062,6 +1064,7 @@ async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(msg, parse_mode='HTML')
 
 async def thongke_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    logging.info("CMD: /thongke received")
     user_id = update.effective_user.id
     
     # Check if user has any active sessions
@@ -1312,6 +1315,7 @@ def main():
     
     # 1. Hàm wrapper cho Start để nó hoạt động như một lệnh Reset cứng trong mọi tình huống
     async def start_fallback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+        logging.info("FALLBACK: Start command triggered")
         # Clear data cũ trước
         context.user_data.clear()
         # Gọi lại hàm start gốc
@@ -1319,16 +1323,20 @@ def main():
 
     # 2. Wrappers cho các lệnh thông tin (giữ nguyên state)
     async def thongke_fallback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+        logging.info("FALLBACK: Thongke command triggered")
         await thongke_command(update, context)
-        # return None để giữ nguyên state hiện tại (không bị out ra ngoài)
+        # return None để giữ nguyên state hiện tại
     
     async def status_fallback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+        logging.info("FALLBACK: Status command triggered")
         await status_command(update, context)
     
     async def help_fallback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+        logging.info("FALLBACK: Help command triggered")
         await help_command(update, context)
 
     async def admin_fallback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+        logging.info("FALLBACK: Admin command triggered")
         await admin_command(update, context)
     
     # Display config status
