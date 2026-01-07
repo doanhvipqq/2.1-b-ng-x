@@ -178,15 +178,17 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     welcome_text = (
         "⚽ <b>BÓNG X</b> ⚽\n\n"
         f"🎯 Chào mừng, <b>{user.first_name}</b>!\n\n"
-        "<b>NỀN TẢNG HỖ TRỢ</b>\n\n"
-        "📸 <b>Instagram</b>\n"
-        "   • Like • Follow • Comment\n\n"
-        "💼 <b>LinkedIn</b>\n"
-        "   • Like • Follow • Share\n\n"
-        "💎 Chọn nền tảng để bắt đầu\n\n"
+        "<blockquote expandable>┌───────────────⭓\n"
+        "├ <b>📱 NỀN TẢNG HỖ TRỢ</b>\n"
+        "├───────────────⭔\n"
+        "├ 📸 Instagram\n"
+        "├   • Like • Follow • Comment\n"
+        "├───────────────⭔\n"
+        "├ 💼 LinkedIn\n"
+        "├   • Like • Follow • Share\n"
+        "└───────────────⭓</blockquote>\n\n"
         "👨‍💻 <b>Trần Đức Doanh</b>\n"
-        "🔗 t.me/doanhvip1\n"
-        "📞 @doanhvip12"
+        "🔗 t.me/doanhvip1 • @doanhvip12"
     )
     
     
@@ -201,27 +203,14 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         ]
     ]
     
+    
     reply_markup = InlineKeyboardMarkup(keyboard)
     
-    # Lấy GIF từ API
-    gif_url = await get_random_gif()
+    # CRITICAL FIX: Tắt GIF tạm thời để đảm bảo inline buttons hoạt động
+    # GIF + inline buttons có thể gây conflict trên một số client Telegram
+    # Sau khi test nút OK, có thể bật lại
     
-    if gif_url:
-        try:
-            # Gửi GIF với caption
-            await update.message.reply_animation(
-                animation=gif_url,
-                caption=welcome_text,
-                reply_markup=reply_markup,
-                parse_mode='HTML'
-            )
-        except Exception as e:
-            logging.error(f"Error sending GIF in /start: {e}")
-            # Fallback: gửi text thông thường nếu GIF lỗi
-            await update.message.reply_text(welcome_text, reply_markup=reply_markup, parse_mode='HTML')
-    else:
-        # Nếu không lấy được GIF, gửi text thông thường
-        await update.message.reply_text(welcome_text, reply_markup=reply_markup, parse_mode='HTML')
+    await update.message.reply_text(welcome_text, reply_markup=reply_markup, parse_mode='HTML')
     
     return MAIN_MENU
 
@@ -235,16 +224,19 @@ async def menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
         # Return to main menu
         user = update.effective_user
         welcome_text = (
-            "👑 <b>BÓNG X</b> 👑\n\n"
+            "⚽ <b>BÓNG X</b> ⚽\n\n"
             f"🎯 Chào mừng, <b>{user.first_name}</b>!\n\n"
-            "<b>NỀN TẢNG HỖ TRỢ</b>\n\n"
-            "📸 <b>Instagram</b>\n"
-            "   • Like • Follow • Comment\n\n"
-            "💼 <b>LinkedIn</b>\n"
-            "   • Like • Follow • Share\n\n"
-            "💎 <i>Chọn nền tảng bên dưới để bắt đầu</i>\n\n"
+            "<blockquote expandable>┌───────────────⭓\n"
+            "├ <b>📱 NỀN TẢNG HỖ TRỢ</b>\n"
+            "├───────────────⭔\n"
+            "├ 📸 Instagram\n"
+            "├   • Like • Follow • Comment\n"
+            "├───────────────⭔\n"
+            "├ 💼 LinkedIn\n"
+            "├   • Like • Follow • Share\n"
+            "└───────────────⭓</blockquote>\n\n"
             "👨‍💻 <b>Trần Đức Doanh</b>\n"
-            "👑 t.me/doanhvip1 • @doanhvip12"
+            "� t.me/doanhvip1 • @doanhvip12"
         )
         keyboard = [
             [
@@ -338,22 +330,31 @@ async def menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
         
     elif query.data == 'status':
         user_id = update.effective_user.id
-        msg = "📊 <b>TÌNH TRẠNG AUTOMATION</b>\n\n"
         
         ig_running = user_id in instagram_automations
         li_running = user_id in linkedin_automations
         
+        msg = (
+            "<blockquote expandable>┌───────────────⭓\n"
+            "├ <b>📊 TÌNH TRẠNG AUTOMATION</b>\n"
+            "├───────────────⭔\n"
+        )
+        
         if ig_running:
-            msg += "✅ Instagram: <b>Đang chạy</b>\n"
+            msg += "├ ✅ Instagram: <b>Đang chạy</b>\n"
         else:
-            msg += "⭕ Instagram: Đang dừng\n"
+            msg += "├ ⭕ Instagram: Đang dừng\n"
             
         if li_running:
-            msg += "✅ LinkedIn: <b>Đang chạy</b>\n"
+            msg += "├ ✅ LinkedIn: <b>Đang chạy</b>\n"
         else:
-            msg += "⭕ LinkedIn: Đang dừng\n"
+            msg += "├ ⭕ LinkedIn: Đang dừng\n"
         
-        msg += "\n💡 Dùng /stop để dừng automation"
+        msg += (
+            "├───────────────⭔\n"
+            "├ 💡 Dùng /stop để dừng\n"
+            "└───────────────⭓</blockquote>"
+        )
         
         # Add quick actions
         keyboard = [
