@@ -973,6 +973,29 @@ def main():
     print("🤖 TELEGRAM BOT AUTOMATION STARTING")
     print("=" * 50)
     
+    # Handler xử lý command khi đang ở trong hội thoại
+    
+    # 1. Hàm wrapper cho Start để nó hoạt động như một lệnh Reset cứng trong mọi tình huống
+    async def start_fallback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+        # Clear data cũ trước
+        context.user_data.clear()
+        # Gọi lại hàm start gốc
+        return await start(update, context)
+
+    # 2. Wrappers cho các lệnh thông tin (giữ nguyên state)
+    async def thongke_fallback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+        await thongke_command(update, context)
+        # return None để giữ nguyên state hiện tại (không bị out ra ngoài)
+    
+    async def status_fallback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+        await status_command(update, context)
+    
+    async def help_fallback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+        await help_command(update, context)
+
+    async def admin_fallback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+        await admin_command(update, context)
+    
     # Display config status
     if Config.ALLOWED_USER_IDS is not None and len(Config.ALLOWED_USER_IDS) > 0:
         print(f"🔒 Access Control: ENABLED ({len(Config.ALLOWED_USER_IDS)} user(s))")
@@ -991,7 +1014,7 @@ def main():
     
     application = ApplicationBuilder().token(Config.TELEGRAM_BOT_TOKEN).build()
     
-    # Conversation Handler cho các bước cài đặt
+    # Conversation Handler tối ưu hóa
     conv_handler = ConversationHandler(
         entry_points=[
             CommandHandler('start', start),
@@ -1001,7 +1024,7 @@ def main():
                 CallbackQueryHandler(menu_callback, pattern='^(ig|li|status|help|back|stop_all)$'),
                 CommandHandler('stop', stop_everything),
             ],
-            # Instagram flow - NEW STATES
+            # Instagram flow
             IG_AUTH: [MessageHandler(filters.TEXT & ~filters.COMMAND, instagram_auth)],
             IG_T_HEADER: [MessageHandler(filters.TEXT & ~filters.COMMAND, instagram_t_header)],
             IG_SELECT_ACCOUNT: [
@@ -1016,7 +1039,7 @@ def main():
                 CallbackQueryHandler(menu_callback, pattern='^back$'),
             ],
             
-            # LinkedIn flow - Keep old for now (will update shortly)
+            # LinkedIn flow
             LI_AUTH: [MessageHandler(filters.TEXT & ~filters.COMMAND, linkedin_auth)],
             LI_T_HEADER: [
                 MessageHandler(filters.TEXT & ~filters.COMMAND, linkedin_cookie),
@@ -1027,98 +1050,49 @@ def main():
             LI_DELAY: [MessageHandler(filters.TEXT & ~filters.COMMAND, start_linkedin)],
         },
         fallbacks=[
+            # QUAN TRỌNG: /start ở đây giúp user thoát khỏi mọi thế kẹt
+            CommandHandler('start', start_fallback),
+            
+            # Các lệnh thoát/reset khác
             CommandHandler('cancel', cancel),
             CommandHandler('reset', reset),
             CommandHandler('stop', stop_everything),
+            CommandHandler('strop', stop_everything),
+            
+            # Các lệnh xem thông tin (Non-blocking)
+            CommandHandler('thongke', thongke_fallback),
+            CommandHandler('stats', thongke_fallback),
+            CommandHandler('status', status_fallback),
+            CommandHandler('help', help_fallback),
+            CommandHandler('admin', admin_fallback),
+            
             CallbackQueryHandler(menu_callback, pattern='^back$'),
         ],
         per_message=False,
     )
     
-    # Add standalone /help command
-    async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-        user_id = update.effective_user.id
-        is_admin = (user_id == Config.ADMIN_USER_ID)
-        
-        help_text = (
-            "⚡️━━━━━━━━━━━━━━━━━━━━━━⚡️\n"
-            "           ⚽ <b>BÓNG X</b> ⚽\n"
-            "⚡️━━━━━━━━━━━━━━━━━━━━━━⚡️\n\n"
-            "┏━━━ <b>📋 LỆNH CƠ BẢN</b> ━━━┓\n"
-            "┃  /start   → Khởi động bot         ┃\n"
-            "┃  /help    → Xem hướng dẫn         ┃\n"
-            "┃  /status  → Trạng thái hiện tại   ┃\n"
-            "┃  /thongke → Xem thống kê chi tiết ┃\n"
-            "┃  /stop    → Dừng automation       ┃\n"
-            "┃  /reset   → Reset bot              ┃\n"
-            "┗━━━━━━━━━━━━━━━━━━━━━━━┛\n\n"
-            "┏━━ <b>📊 THỐNG KÊ</b> ━━┓\n"
-            "┃  <b>/thongke</b> hoặc <b>/stats</b>     ┃\n"
-            "┃                                   ┃\n"
-            "┃  • Tốc độ chạy (jobs/phút)       ┃\n"
-            "┃  • Tiến độ (%)                   ┃\n"
-            "┃  • Thu nhập real-time            ┃\n"
-            "┃  • Tỷ lệ thành công              ┃\n"
-            "┗━━━━━━━━━━━━━━━━━━━━━━━┛\n\n"
-        )
-        
-        if is_admin:
-            help_text += (
-                "┏━━ <b>👑 ADMIN PANEL</b> ━━┓\n"
-                "┃  <b>/admin</b> - Quản lý hệ thống   ┃\n"
-                "┃                                   ┃\n"
-                "┃  • Tất cả users đang chạy        ┃\n"
-                "┃  • Tốc độ & Hiệu suất            ┃\n"
-                "┃  • Tổng thu nhập                 ┃\n"
-                "┗━━━━━━━━━━━━━━━━━━━━━━━┛\n\n"
-            )
-        
-        help_text += (
-            "┏━━ <b>🔧 HƯỚNG DẪN</b> ━━┓\n"
-            "┃                                   ┃\n"
-            "┃  1️⃣ Chọn nền tảng (IG/LinkedIn)  ┃\n"
-            "┃  2️⃣ Nhập Token + T Header        ┃\n"
-            "┃  3️⃣ Chọn tài khoản               ┃\n"
-            "┃  4️⃣ Nhập Cookie                  ┃\n"
-            "┃  5️⃣ Cấu hình Jobs + Delay        ┃\n"
-            "┃  6️⃣ Xác nhận và chạy!            ┃\n"
-            "┃                                   ┃\n"
-            "┗━━━━━━━━━━━━━━━━━━━━━━━┛\n\n"
-            "💡 <b>GỢI Ý:</b>\n"
-            "  • Delay ≥ 10s để tránh spam\n"
-            "  • Dùng /thongke xem chi tiết\n"
-            "  • Token lấy từ Golike\n\n"
-            "━━━━━━━━━━━━━━━━━━━━━━━\n"
-            "👨‍💻 <b>Trần Đức Doanh</b>\n"
-            "� t.me/doanhvip1 • @doanhvip12\n"
-            "━━━━━━━━━━━━━━━━━━━━━━━"
-        )
-        await update.message.reply_text(help_text, parse_mode='HTML')
+    # Add handler
+    application.add_handler(conv_handler)
     
-    # Add standalone /status command
-    async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-        user_id = update.effective_user.id
-        msg = "📊 <b>TÌNH TRẠNG AUTOMATION</b>\n\n"
-        
-        ig_running = user_id in instagram_automations
-        li_running = user_id in linkedin_automations
-        
-        if ig_running:
-            msg += "✅ Instagram: <b>Đang chạy</b>\n"
-        else:
-            msg += "⭕ Instagram: Đang dừng\n"
-            
-        if li_running:
-            msg += "✅ LinkedIn: <b>Đang chạy</b>\n"
-        else:
-            msg += "⭕ LinkedIn: Đang dừng\n"
-        
-        msg += "\n💡 Dùng /stop để dừng automation"
-        msg += "\n📈 Dùng /thongke để xem chi tiết"
-        await update.message.reply_text(msg, parse_mode='HTML')
+    # Add commands global
+    application.add_handler(CommandHandler('start', start)) # Backup
+    application.add_handler(CommandHandler('help', help_command))
+    application.add_handler(CommandHandler('status', status_command))
+    application.add_handler(CommandHandler('thongke', thongke_command))
+    application.add_handler(CommandHandler('stats', thongke_command))
+    application.add_handler(CommandHandler('admin', admin_command))
+    application.add_handler(CommandHandler('reset', reset))
+    application.add_handler(CommandHandler('stop', stop_everything))
     
-    # Add detailed stats command
-    async def thongke_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    print("🚀 Bot is starting...")
+    print("📡 Using polling mode (long-polling)")
+    print("🌐 Waiting for incoming messages...")
+    print("=" * 50)
+    application.run_polling()
+
+if __name__ == '__main__':
+    keep_alive()
+    main()
         user_id = update.effective_user.id
         
         # Check if user has any active sessions
